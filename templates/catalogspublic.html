@@ -1,0 +1,29 @@
+{% extends "main.html" %}
+{% block content %}
+<div class="row top-menu">
+    <div class="col-md-10"></div>
+    <div class="col-md-2 text-right">
+        <a href="{{url_for('showLogin')}}">Click Here to Log in </a>
+    </div>
+</div>
+Public Catalogs
+{% for catalog in catalogs %}
+<a href="{{ url_for('showCatalogItems',catalog_name = catalog.name,catalog_id = catalog.id)}}">
+    <h2>{{catalog.name}}</h2>
+</a>
+{% endfor %}
+<br>
+<a href="{{ url_for('addItem')}}">Add item</a>
+<br>
+<h1>{{title}}</h1>
+{% for item in items %}
+<h3>
+    <a href="{{ url_for('showItemDetails',catalog_name = item.catalog.name,item_name = item.name)}}">
+        {{item.name}}
+        ({{item.catalog.name}})
+    </a>
+</h3>
+{% endfor %}
+{% endblock %}
+
+

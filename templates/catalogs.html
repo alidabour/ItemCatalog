@@ -1,0 +1,19 @@
+{% extends "main.html" %}
+{% block content %}
+{% include "head.html" %}
+{% for catalog in catalogs %}
+<a href="{{ url_for('showCatalogItems',catalog_name = catalog.name,catalog_id = catalog.id)}}">
+    <h2>{{catalog.name}}</h2>
+</a>
+{% endfor %}
+<a href="{{url_for('addItem')}}">Add item</a>
+<h1>{{title}}</h1>
+{% for item in items %}
+<h3>
+    <a href="{{ url_for('showItemDetails',catalog_name = item.catalog.name,item_name = item.name)}}">
+        {{item.name}}
+        ({{item.catalog.name}})
+    </a>
+</h3>
+{% endfor %}
+{% endblock %}

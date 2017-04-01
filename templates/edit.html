@@ -1,0 +1,21 @@
+{% extends "main.html" %}
+{% block content %}
+{% include "head.html" %}
+<h1>Edit item</h1>
+<form action="#" method="post">
+    <label for="name">Title:</label>
+    <input type ="text" maxlength="100" name="name" value="{{ item.name }}">
+    <br>
+    <label for="description">Description:</label>
+    <textarea class="form-control" maxlength="250" rows="3" name="description">{{ item.description }}</textarea>
+    <br>
+    <label for="catalog">Catalog:</label>
+    <select name="catalog">
+        {% for catalog in catalogs %}
+        <option value="{{catalog.name}}">{{catalog.name}}</option>
+        {% endfor %}
+    </select>
+    <br>
+    <button type="submit" id="submit" type="submit" class="btn">Edit</button>
+</form>
+{% endblock %}
