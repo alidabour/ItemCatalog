@@ -124,7 +124,8 @@ def gconnect():
     output += '!</h1>'
     output += '<img src="'
     output += login_session['picture']
-    output += ' " style = "width: 300px; height: 300px;border-radius: 150px;-webkit-border-radius: 150px;-moz-border-radius: 150px;"> '
+    output += '" style = "width: 300px; height: 300px;border-radius: 150px;-webkit-border-radius: ' \
+              '150px;-moz-border-radius: 150px;"> '
     return output
 
 
@@ -230,6 +231,8 @@ def editItem(item_name):
     catalogs = session.query(Catalog).order_by(asc(Catalog.name))
     if 'username' not in login_session:
         return redirect(url_for('showLogin'))
+    if login_session['user_id'] != item.user_id:
+        return redirect(url_for('addItem'))
     if request.method == 'POST':
         if request.form['name']:
             item.name = request.form['name']
@@ -250,6 +253,8 @@ def deleteItem(item_name):
     item = session.query(CatalogItem).filter_by(name=item_name).one()
     if 'username' not in login_session:
         return redirect(url_for('showLogin'))
+    if login_session['user_id'] != item.user_id:
+        return redirect(url_for('addItem'))
     if request.method == 'POST':
         session.delete(item)
         session.commit()
