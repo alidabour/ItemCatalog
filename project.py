@@ -1,3 +1,9 @@
+"""
+This code is simple backend for catalog website
+Created by Ali Dabour on 4/2017
+I wrote this code while learning Full Stack Nanodegree @udacity.com
+"""
+
 from database_setup import Base, CatalogItem, Catalog, User
 from flask import Flask, render_template, request, redirect, jsonify, url_for
 from sqlalchemy import create_engine, asc
@@ -11,6 +17,7 @@ import httplib2
 import json
 from flask import make_response
 import requests
+from functools import wraps
 
 app = Flask(__name__)
 
@@ -26,9 +33,23 @@ DBSession = sessionmaker(bind=engine)
 session = DBSession()
 
 
-# Create anti-forgery state token
+# Login decorate
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'username' not in login_session:
+            return redirect(url_for('showLogin'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
 @app.route('/login')
 def showLogin():
+    """
+    purpose :handle /login
+    :return: render login.html
+    """
+    # Create anti-forgery state token
     state = ''.join(random.choice(string.ascii_uppercase + string.digits)
                     for x in xrange(32))
     login_session['state'] = state
@@ -37,6 +58,11 @@ def showLogin():
 
 @app.route('/gconnect', methods=['POST'])
 def gconnect():
+    """
+    connect to google
+    retrieve user information
+    :return: welcome message
+    """
     # Validate state token
     if request.args.get('state') != login_session['state']:
         response = make_response(json.dumps('Invalid state parameter.'), 401)
@@ -50,10 +76,7 @@ def gconnect():
         oauth_flow = flow_from_clientsecrets('client_secrets.json', scope='')
         oauth_flow.redirect_uri = 'postmessage'
         credentials = oauth_flow.step2_exchange(code)
-        print "Credential 1"
-        print credentials
     except FlowExchangeError:
-        print "FlowExchangeError"
         response = make_response(
             json.dumps('Failed to upgrade the authorization code.'), 401)
         response.headers['Content-Type'] = 'application/json'
@@ -131,6 +154,11 @@ def gconnect():
 
 # User Helper Functions
 def createUser(login_session):
+    """
+    create user in database
+    :param login_session:
+    :return: user id
+    """
     newUser = User(name=login_session['username'], email=login_session[
         'email'], picture=login_session['picture'])
     session.add(newUser)
@@ -140,11 +168,21 @@ def createUser(login_session):
 
 
 def getUserInfo(user_id):
+    """
+    get user from database
+    :param user_id:
+    :return: user object
+    """
     user = session.query(User).filter_by(id=user_id).one()
     return user
 
 
 def getUserID(email):
+    """
+    get user id from database
+    :param email:
+    :return: user id
+    """
     try:
         user = session.query(User).filter_by(email=email).one()
         return user.id
@@ -155,6 +193,10 @@ def getUserID(email):
 # DISCONNECT - Revoke a current user's token and reset their login_session
 @app.route('/gdisconnect')
 def gdisconnect():
+    """
+    disconnect google user
+    :return: redirect to public catalog page
+    """
     # Only disconnect a connected user.
     credentials = login_session.get('credentials')
     if credentials is None:
@@ -183,6 +225,10 @@ def gdisconnect():
 
 @app.route('/disconnect')
 def disconnect():
+    """
+    disconnect user from site
+    :return: redirect to public catalog page
+    """
     if 'provider' in login_session:
         if login_session['provider'] == 'google':
             gdisconnect()
@@ -203,17 +249,20 @@ def showCatalogs():
         return render_template('catalogs.html', catalogs=catalogs, title="Latest items", items=items)
 
 
-# Create a new catalog
-@app.route('/catalog/<string:catalog_name><int:catalog_id>/items/')
-def showCatalogItems(catalog_name, catalog_id):
+# Show catalog items for specific catalog
+@app.route('/catalog/<string:catalog_name>/items/')
+def showCatalogItems(catalog_name):
     catalogs = session.query(Catalog).order_by(asc(Catalog.name))
-    items = session.query(CatalogItem).filter_by(catalog_id=catalog_id).order_by(asc(CatalogItem.name))
+    # query catalog for the catalog name passed
+    catalog = session.query(Catalog).filter_by(name=catalog_name).one()
+    items = session.query(CatalogItem).filter_by(catalog_id=catalog.id).order_by(asc(CatalogItem.name))
     if 'username' not in login_session:
         return render_template('catalogspublic.html', catalogs=catalogs, title=catalog_name + " items", items=items)
     else:
         return render_template('catalogs.html', catalogs=catalogs, title=catalog_name + " items", items=items)
 
 
+# show item details
 @app.route('/catalog/<string:catalog_name>/<string:item_name>/')
 def showItemDetails(catalog_name, item_name):
     item = session.query(CatalogItem).filter_by(name=item_name).one()
@@ -225,12 +274,11 @@ def showItemDetails(catalog_name, item_name):
         return render_template('itemdetails.html', item_name=item_name, item_description=item.description)
 
 
+# edit catalog item if the user is login and user_id = item.user_id
 @app.route('/catalog/<string:item_name>/edit/', methods=['GET', 'POST'])
+@login_required
 def editItem(item_name):
     item = session.query(CatalogItem).filter_by(name=item_name).one()
-    catalogs = session.query(Catalog).order_by(asc(Catalog.name))
-    if 'username' not in login_session:
-        return redirect(url_for('showLogin'))
     if login_session['user_id'] != item.user_id:
         return redirect(url_for('addItem'))
     if request.method == 'POST':
@@ -245,14 +293,15 @@ def editItem(item_name):
         session.commit()
         return redirect(url_for('showCatalogs'))
     else:
+        catalogs = session.query(Catalog).order_by(asc(Catalog.name))
         return render_template('edit.html', item=item, catalogs=catalogs)
 
 
+# delete item
 @app.route('/catalog/<string:item_name>/delete/', methods=['GET', 'POST'])
+@login_required
 def deleteItem(item_name):
     item = session.query(CatalogItem).filter_by(name=item_name).one()
-    if 'username' not in login_session:
-        return redirect(url_for('showLogin'))
     if login_session['user_id'] != item.user_id:
         return redirect(url_for('addItem'))
     if request.method == 'POST':
@@ -263,11 +312,11 @@ def deleteItem(item_name):
         return render_template('delete.html')
 
 
+# add item to database .
+# require user login
 @app.route('/catalog/add/', methods=['GET', 'POST'])
+@login_required
 def addItem():
-    catalogs = session.query(Catalog).order_by(asc(Catalog.name))
-    if 'username' not in login_session:
-        return redirect(url_for('showLogin'))
     if request.method == 'POST':
         if request.form['catalog']:
             catalog = session.query(Catalog).filter_by(name=request.form['catalog']).one()
@@ -277,6 +326,7 @@ def addItem():
         session.commit()
         return redirect(url_for('showCatalogs'))
     else:
+        catalogs = session.query(Catalog).order_by(asc(Catalog.name))
         return render_template('addItem.html', catalogs=catalogs)
 
 
